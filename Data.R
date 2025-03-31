@@ -1,8 +1,6 @@
-####################################################################################################################
-####################################################################################################################
-#------------------------------------- Packages --------------------------------------------------------------------
-####################################################################################################################
-####################################################################################################################
+
+#------------------------------------- Packages and WD ---------------------------------------#
+
 library(tidyverse) ### Data manipulations
 library(dtplyr) ### Data manipulations - merge datasets
 library(ggplot2) ### Plots
@@ -16,14 +14,11 @@ library(matrixcalc) ### Matrix calculations
 library("RColorBrewer") ### Colors
 library(latex2exp) ### Text for plots
 library(matrixStats) ### ColSds
-
-setwd("C:/Users/youss/OneDrive - University of Copenhagen/Master Thesis Files")
+setwd("C:/Users/youss/OneDrive - University of Copenhagen/Master's Thesis")
 load("yields.RData")
-####################################################################################################################
-####################################################################################################################
-#------------------------------------- Data ------------------------------------------------------------------------
-####################################################################################################################
-####################################################################################################################
+
+#------------------------------------- Data --------------------------------------------------#
+
 
 
 ### Create data
@@ -69,23 +64,54 @@ yields_df$DateCont <- year(yields_df$Date) + (month(yields_df$Date) - 1)/12 + (d
 
 
 
-#------------------------------------- Timeseries plot -------------------------------------------------------------
-
+#------------------------------------- Timeseries plot -------------------------------------------------------------#
 
 yields_df %>%
   ggplot(aes(x = DateCont, y = as.numeric(yields_df$"3M"))) +
-  geom_line(color = "steelblue") +
+  geom_line(color = "#901a1E") +
   theme_bw() +
-  xlab("Time") +
-  ylab("3M Rates") +
-  ggtitle("3 Month Rates Rates vs. Time") +
+  xlab(TeX("Year")) +
+  ylab(TeX("3M Rates")) +
+  ggtitle(TeX("3M rates from 1984 to 2022")) +
   theme(plot.title = element_text(size=17, hjust= 0.5)) +
   theme(axis.title = element_text(size=13)) +
-  theme(axis.text.x = element_text(size=9, angle = 0, vjust = 0.7),
-        axis.text.y = element_text(size=9)) +
+  theme(axis.text.x = element_text(size=13, angle = 0, vjust = 0.7),
+        axis.text.y = element_text(size=13)) +
   scale_x_continuous(breaks = c(1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020)) +
   scale_y_continuous(breaks=c(0.00, 0.02, 0.04, 0.06, 0.08, 0.10), limits = c(0, 0.11))
 
+yields_df <- yields_df[yields_df$`3M` != 0, ]
+#yields_df$"3M" <- as.numeric(yields_df$"3M")
+hist(as.numeric(yields_df$"3M"))
 
-#----------------------------------SAVE DATA----------------------------------------------#
 
+
+#------------------------------------- ACF plot -----------------------------------------------------------------------#
+
+# Compute the autocorrelation
+acf_data <- acf(as.numeric(yields_df$"3M"), lag.max = 100, plot = FALSE)
+
+# Extract values
+acf_values <- data.frame(
+  Lag = acf_data$lag[, 1, 1],
+  ACF = acf_data$acf[, 1, 1]
+)
+
+# Define confidence limits
+conf_limit <- qnorm((1 + 0.95) / 2) / sqrt(length(yields_df$"3M"))
+
+ggplot(acf_values, aes(x = Lag, y = ACF)) +
+  geom_hline(yintercept = 0, color = "black", linetype = "dashed") +
+  geom_segment(aes(xend = Lag, yend = 0), color = "#901a1E") +
+  geom_point(color = "#901a1E", size = 2) +
+  geom_hline(yintercept = c(-conf_limit, conf_limit), color = "#901a1E", linetype = "dashed") +
+  labs(
+    title = TeX("Autocorrelation of 3M Rates (100 Lags)"),
+    x = TeX("Lag"),
+    y = TeX("ACF")
+  ) +
+  theme_minimal(base_family = "serif") +
+  theme(
+    text = element_text(family = "serif", size = 14),
+    plot.title = element_text(hjust = 0.5)
+  )
