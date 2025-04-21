@@ -9,6 +9,8 @@ load("fitted_models_HMM.RData")
 
 #----------------------------------------- N-state HMM --------------------------------------------------------
 
+
+### Function to extract CIR ARHMM parameters 
 extract_parameters_CIR <- function(theta.star, N) {
   kappa <- exp(theta.star[1:N]) * 252  # Scale kappa
   theta <- exp(theta.star[(N + 1):(2 * N)])  # Theta (not scaled)
@@ -23,62 +25,91 @@ extract_parameters_CIR <- function(theta.star, N) {
   list(kappa = kappa, theta = theta, sigma = sigma, Gamma = Gamma, delta = delta)
 }
 
-lForward_CIR <- function(y, mod, N) {
+### Function to compute the log-forward probabilities
+lForward_CIR <- function(y, mod, N, dt = 1/252) {
   params <- extract_parameters_CIR(mod$par, N)
   T <- length(y)
-  mus <- matrix(params$theta, nrow = T, ncol = N, byrow = TRUE)
-  sigmas <- matrix(sqrt(params$sigma^2 / (2 * params$kappa)), nrow = T, ncol = N, byrow = TRUE)
-  
   lalpha <- matrix(NA, N, T)
-  P <- dnorm(y[1], mean = mus[1, ], sd = sigmas[1, ])
-  foo <- params$delta * P
+  kappa <- params$kappa
+  theta <- params$theta
+  sigma <- params$sigma
+  delta <- params$delta
+  Gamma <- params$Gamma
+  q <- 2 * kappa * theta / sigma^2 - 1
+  c <- 2 * kappa / ((1 - exp(-kappa * dt)) * sigma^2)
+  u <- c * y[1] * exp(-kappa * dt)
+  v <- c * y[2]
+  
+  df <- 2 * q + 2
+  ncp <- 2 * u
+  
+  P <- dchisq(y[2] * (2 * c), df = df, ncp = ncp) * (2 * c)
+  foo <- delta * P
   sumfoo <- sum(foo)
   lscale <- log(sumfoo)
   foo <- foo / sumfoo
   lalpha[, 1] <- lscale + log(foo)
-  
-  for (i in 2:T) {
-    P <- dnorm(y[i], mean = mus[i, ], sd = sigmas[i, ])
-    foo <- foo %*% params$Gamma * P
-    sumfoo <- sum(foo) 
-    lscale <- lscale + log(sumfoo)
-    foo <- foo / sumfoo
-    lalpha[, i] <- log(foo) + lscale
+  # Forward loop using P(r_3,r_2) first
+  for (i in 3:T) {
+      u <- c * y[i - 1] * exp(-kappa * dt)
+      v <- c * y[i]
+      P <- dchisq(y[i] * (2 * c), df = 2 * q + 2, ncp = 2 * u) * (2 * c)
+    
+    
+      foo <- foo %*% Gamma * P
+      sumfoo <- sum(foo)
+      lscale <- lscale + log(sumfoo)
+      foo <- foo / sumfoo
+      lalpha[, i-1] <- log(foo) + lscale
   }
-  
   return(lalpha)
-}
+ }
 
-PseudoResiduals <- function(y, mod, N) {
+PseudoResiduals <- function(y, mod, N, dt = 1/252) {
   params <- extract_parameters_CIR(mod$par, N)
-  mus <- matrix(params$theta, nrow = length(y), ncol = N, byrow = TRUE)
-  sigmas <- matrix(sqrt(params$sigma^2 / (2 * params$kappa)), nrow = length(y), ncol = N, byrow = TRUE)
+  kappa <- params$kappa
+  theta <- params$theta
+  sigma <- params$sigma
+  delta <- params$delta
+  Gamma <- params$Gamma
+  q <- 2 * kappa * theta / sigma^2 - 1
+  c <- 2 * kappa / ((1 - exp(-kappa * dt)) * sigma^2)
+  u <- c * y[1] * exp(-kappa * dt)
+  v <- c * y[2]
+  df <- 2 * q + 2
+  ncp <- 2 * u
   
-  la <- t(lForward_CIR(y = y, mod = mod, N = N))
+  la <- t(lForward_CIR(y = y, mod = mod, N = N))  # Compute log-forward probabilities using modified lForward function
   n <- length(y)
   Res <- rep(NA, n)
   pMat <- matrix(NA, nrow = n, ncol = N)
+  pMat[1, ] <- pchisq(y[2] * (2 * c), df = df, ncp = ncp)
   
-  pMat[1, ] <- pnorm(y[1], mean = mus[1, ], sd = sigmas[1, ])
+  # Compute residuals
   Res[1] <- qnorm(params$delta %*% pMat[1, ])
   
-  for (i in 2:n) {
-    pMat[i, ] <- pnorm(y[i], mean = mus[i, ], sd = sigmas[i, ])
-    c <- max(la[i - 1, ])
-    a <- exp(la[i - 1, ] - c)
-    weighted_Gamma <- params$Gamma / sum(a)
-    Res[i] <- qnorm(a %*% weighted_Gamma %*% pMat[i, ])
+  for (i in 3:n) {
+    q <- 2 * kappa * theta / sigma^2 - 1
+    u <- c * y[i] * exp(-kappa * dt)
+    df <- 2 * q + 2
+    ncp <- 2 * u
+    pMat[i, ] <- pchisq(y[i] * (2 * c), df = df, ncp = ncp)
+    c <- max(la[i - 2, ])
+    a <- exp(la[i - 2, ] - c) # - c
+    weights <- a / sum(a)
+    weighted_Gamma <- t(weights) %*% params$Gamma
+    Res[i-1] <- qnorm(weighted_Gamma %*% pMat[i, ])
   }
   
   return(list(Res = Res))
 }
+
 #----------------------------------------- PseudoResiduals --------------------------------------------------------
 
 
-### theta
+
+### ### ### theta
 pseudo_res_2_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod2_theta, N = 2)
-
-
 pseudo_res_3_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3_theta, N = 3)
 pseudo_res_4_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4_theta, N = 4)
 pseudo_res_5_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_theta, N = 5)
