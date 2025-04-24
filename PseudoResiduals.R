@@ -105,7 +105,7 @@ PseudoResiduals <- function(y, mod, N, dt = 1/252) {
   # Calculate log-forward probabilities
   la <- t(lForward_CIR(y = y, mod = mod, N = N))
   n <- length(y)
-  Res <- rep(NA, n-1)  # Initialize residuals vector
+  Res <- rep(NA, n)  # Initialize residuals vector
   pMat <- matrix(NA, nrow = n, ncol = N)  # Matrix to store CDF values
   
   # Compute probability for first residual
@@ -113,7 +113,7 @@ PseudoResiduals <- function(y, mod, N, dt = 1/252) {
   Res[1] <- qnorm(params$delta %*% pMat[1, ])
   
   # Loop over time steps to compute remaining residuals
-  for (i in 3:n) { #### 2 or 3???????????????????????
+  for (i in 3:n) {
     q <- 2 * kappa * theta / sigma^2 - 1
     u <- c * y[i-1] * exp(-kappa * dt)
     df <- 2 * q + 2
