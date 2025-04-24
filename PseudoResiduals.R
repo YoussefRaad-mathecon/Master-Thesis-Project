@@ -98,13 +98,14 @@ PseudoResiduals <- function(y, mod, N, dt = 1/252) {
   c <- 2 * kappa / ((1 - exp(-kappa * dt)) * sigma^2)
   u <- c * y[1] * exp(-kappa * dt)
   v <- c * y[2]
-  df <- 2 * q + 2
-  ncp <- 2 * u
+  
+  df <- 2 * q + 2 # Degrees of freedom of the scaled non-central chi square
+  ncp <- 2 * u # non-centrality parameter of the scaled non-central chi square
   
   # Calculate log-forward probabilities
   la <- t(lForward_CIR(y = y, mod = mod, N = N))
   n <- length(y)
-  Res <- rep(NA, n)  # Initialize residuals vector
+  Res <- rep(NA, n-1)  # Initialize residuals vector
   pMat <- matrix(NA, nrow = n, ncol = N)  # Matrix to store CDF values
   
   # Compute probability for first residual
@@ -112,90 +113,70 @@ PseudoResiduals <- function(y, mod, N, dt = 1/252) {
   Res[1] <- qnorm(params$delta %*% pMat[1, ])
   
   # Loop over time steps to compute remaining residuals
-  for (i in 3:n) {
+  for (i in 3:n) { #### 2 or 3???????????????????????
     q <- 2 * kappa * theta / sigma^2 - 1
-    u <- c * y[i] * exp(-kappa * dt)
+    u <- c * y[i-1] * exp(-kappa * dt)
     df <- 2 * q + 2
     ncp <- 2 * u
     
     # Compute CDF of non-central chi-square for each state
-    pMat[i, ] <- pchisq(y[i] * (2 * c), df = df, ncp = ncp)
+    pMat[i-1, ] <- pchisq(y[i] * (2 * c), df = df, ncp = ncp)
     
     # Compute state probabilities using smoothed weights
     c <- max(la[i - 2, ])
     a <- exp(la[i - 2, ] - c)  # Stabilize log-space probabilities
     weights <- a / sum(a)
-    weighted_Gamma <- t(weights) %*% params$Gamma
+    weighted_Gamma <- t(weights) %*% Gamma
     
     # Calculate pseudo-residual
-    Res[i - 1] <- qnorm(weighted_Gamma %*% pMat[i, ])
+    Res[i - 1] <- qnorm(weighted_Gamma %*% pMat[i-1, ])
   }
   
   return(list(Res = Res))
 }
 
-
 #----------------------------------------- PseudoResiduals --------------------------------------------------------
+### Missing Values
 
+### theta
 
-
-### ### ### theta
-pseudo_res_2_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod2_theta, N = 2)
-pseudo_res_3_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3_theta, N = 3)
-pseudo_res_4_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4_theta, N = 4)
-pseudo_res_5_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_theta, N = 5)
-
-
-
+sum(!is.finite(pseudo_res_2_theta$Res)) # 0
+sum(!is.finite(pseudo_res_3_theta$Res)) # 0 
+sum(!is.finite(pseudo_res_4_theta$Res)) # 0 
+sum(!is.finite(pseudo_res_5_theta$Res)) # 0
 
 ### kappa
-pseudo_res_2_kappa <- PseudoResiduals(as.numeric(yields_df$"3M"), mod2_kappa, N = 2)
-pseudo_res_3_kappa <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3_kappa, N = 3)
-pseudo_res_4_kappa <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4_kappa, N = 4)
-pseudo_res_5_kappa <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_kappa, N = 5)
-
-
-
-
+sum(!is.finite(pseudo_res_2_kappa$Res)) # 1
+sum(!is.finite(pseudo_res_3_kappa$Res)) # 0 
+sum(!is.finite(pseudo_res_4_kappa$Res)) # 0 
+sum(!is.finite(pseudo_res_5_kappa$Res)) # 0
 
 ### sigma
-pseudo_res_2_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod2_sigma, N = 2)
-pseudo_res_3_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3_sigma, N = 3)
-pseudo_res_4_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4_sigma, N = 4)
-pseudo_res_5_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_sigma, N = 5)
-
-
-
-
-
+sum(!is.finite(pseudo_res_2_sigma$Res)) # 3436
+sum(!is.finite(pseudo_res_3_sigma$Res)) # 3437
+sum(!is.finite(pseudo_res_4_sigma$Res)) # 0 
+sum(!is.finite(pseudo_res_5_sigma$Res)) # 3437
 
 
 ### sigma theta
-pseudo_res_2_sigma_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod2_sigma_theta, N = 2)
-pseudo_res_3_sigma_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3_sigma_theta, N = 3)
-pseudo_res_4_sigma_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4_sigma_theta, N = 4)
-pseudo_res_5_sigma_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_sigma_theta, N = 5)
-
-
-
+sum(!is.finite(pseudo_res_2_sigma_theta$Res)) # 3437
+sum(!is.finite(pseudo_res_3_sigma_theta$Res)) # 0
+sum(!is.finite(pseudo_res_4_sigma_theta$Res)) # 0
+sum(!is.finite(pseudo_res_5_sigma_theta$Res)) # 0
 
 
 ### sigma kappa
-pseudo_res_2_kappa_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod2_kappa_sigma, N = 2)
-pseudo_res_3_kappa_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3_kappa_sigma, N = 3)
-pseudo_res_4_kappa_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4_kappa_sigma, N = 4)
-pseudo_res_5_kappa_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_kappa_sigma, N = 5)
-
-
-
+sum(!is.finite(pseudo_res_2_kappa_sigma$Res)) # 3437
+sum(!is.finite(pseudo_res_3_kappa_sigma$Res)) # 0
+sum(!is.finite(pseudo_res_4_kappa_sigma$Res)) # 3
+sum(!is.finite(pseudo_res_5_kappa_sigma$Res)) # 0
 
 
 ### kappa theta
-pseudo_res_2_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod2_kappa_theta, N = 2)
-pseudo_res_3_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3_kappa_theta, N = 3)
-pseudo_res_4_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4_kappa_theta, N = 4)
-pseudo_res_5_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_kappa_theta, N = 5)
-
+sum(!is.finite(pseudo_res_2_kappa_theta$Res)) # 0
+sum(!is.finite(pseudo_res_3_kappa_theta$Res)) # 0
+sum(!is.finite(pseudo_res_4_kappa_theta$Res)) # 3437
+sum(!is.finite(pseudo_res_5_kappa_theta$Res)) # 0
 
 
 
@@ -203,193 +184,10 @@ pseudo_res_5_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_kap
 
 
 ### sigma theta kappa
-pseudo_res_2_sigma_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod2, N = 2)
-pseudo_res_3_sigma_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3, N = 3)
-pseudo_res_4_sigma_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4, N = 4)
-pseudo_res_5_sigma_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5, N = 5)
-
-
-
-
-
-
-
-#----------------------------------------- SMALL PLOTS --------------------------------------------------------
-
-
-par(oma=c(3,3,0,1),mar=c(3,3,2,3),mfrow=c(3,4))
-
-### theta
-qqnorm(pseudo_res_2_theta$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_2_theta$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_3_theta$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_3_theta$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_4_theta$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_4_theta$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_5_theta$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_5_theta$Res, col = "steelblue", lwd = 3)
-
-
-
-### kappa
-qqnorm(pseudo_res_2_kappa$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_2_kappa$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_3_kappa$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_3_kappa$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_4_kappa$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_4_kappa$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_5_kappa$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_5_kappa$Res, col = "steelblue", lwd = 3)
-
-
-### sigma
-qqnorm(pseudo_res_2_sigma$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_2_sigma$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_3_sigma$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_3_sigma$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_4_sigma$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_4_sigma$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_5_sigma$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_5_sigma$Res, col = "steelblue", lwd = 3)
-
-
-
-
-mtext(text="Theoretical Quantiles",side=1,line=1,outer=TRUE, cex = 2.7)
-mtext(text="Sample Quantiles",side=2,line=0,outer=TRUE, cex = 2.7, adj = 0.5)
-mtext(text=expression(theta),side=4,line=-1,outer=TRUE, cex = 2, adj = 0.85)
-mtext(text=expression(kappa),side=4,line=-1,outer=TRUE, cex = 2, adj = 0.5)
-mtext(text=expression(sigma),side=4,line=-1,outer=TRUE, cex = 2, adj = 0.15)
-
-
-
-
-
-
-
-
-
-
-
-
-
-par(oma=c(3,3,0,1),mar=c(3,3,2,3),mfrow=c(3,4))
-
-### theta sigma
-qqnorm(pseudo_res_2_sigma_theta$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_2_sigma_theta$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_3_sigma_theta$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_3_sigma_theta$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_4_sigma_theta$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_4_sigma_theta$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_5_sigma_theta$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_5_sigma_theta$Res, col = "steelblue", lwd = 3)
-
-
-
-### kappa theta
-qqnorm(pseudo_res_2_kappa_theta$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_2_kappa_theta$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_3_kappa_theta$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_3_kappa_theta$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_4_kappa_theta$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_4_kappa_theta$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_5_kappa_theta$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_5_kappa_theta$Res, col = "steelblue", lwd = 3)
-
-
-### sigma kappa
-qqnorm(pseudo_res_2_kappa_sigma$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_2_kappa_sigma$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_3_kappa_sigma$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_3_kappa_sigma$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_4_kappa_sigma$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_4_kappa_sigma$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_5_kappa_sigma$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_5_kappa_sigma$Res, col = "steelblue", lwd = 3)
-
-
-
-
-mtext(text="Theoretical Quantiles",side=1,line=1,outer=TRUE, cex = 2.7)
-mtext(text="Sample Quantiles",side=2,line=0,outer=TRUE, cex = 2.7, adj = 0.5)
-mtext(text=expression(theta * ", " * sigma),side=4,line=-1,outer=TRUE, cex = 2, adj = 0.85)
-mtext(text=expression(theta * ", " * kappa),side=4,line=-1,outer=TRUE, cex = 2, adj = 0.5)
-mtext(text=expression(kappa * ", " * sigma),side=4,line=-1,outer=TRUE, cex = 2, adj = 0.15)
-
-
-
-
-
-
-
-
-
-
-par(oma=c(3,3,0,1),mar=c(3,3,2,3),mfrow=c(3,4))
-
-### theta sigma kappa
-qqnorm(pseudo_res_2_sigma_kappa_theta$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_2_sigma_kappa_theta$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_3_sigma_kappa_theta$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_3_sigma_kappa_theta$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_4_sigma_kappa_theta$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_4_sigma_kappa_theta$Res, col = "steelblue", lwd = 3)
-
-qqnorm(pseudo_res_5_sigma_kappa_theta$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 2.7)
-qqline(pseudo_res_5_sigma_kappa_theta$Res, col = "steelblue", lwd = 3)
-
-mtext(text="Theoretical Quantiles",side=1,line=1,outer=TRUE, cex = 2.7)
-mtext(text="Sample Quantiles",side=2,line=0,outer=TRUE, cex = 2.7, adj = 0.5)
-
+sum(!is.finite(pseudo_res_2_sigma_kappa_theta$Res)) # 2
+sum(!is.finite(pseudo_res_3_sigma_kappa_theta$Res)) # 1
+sum(!is.finite(pseudo_res_4_sigma_kappa_theta$Res)) # 0
+sum(!is.finite(pseudo_res_5_sigma_kappa_theta$Res)) # 1
 
 
 #----------------------------------------- BIG PLOT --------------------------------------------------------
@@ -401,139 +199,123 @@ par(mfrow = c(7, 4), mar = c(2, 2, 2, 1), oma = c(3, 3, 0, 2))
 
 
 ### theta
-qqnorm(pseudo_res_2_theta$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_2_theta$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_2_theta$Res[is.finite(pseudo_res_2_theta$Res)], main = "2-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_2_theta$Res[is.finite(pseudo_res_2_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_3_theta$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_3_theta$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_3_theta$Res[is.finite(pseudo_res_3_theta$Res)], main = "3-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_3_theta$Res[is.finite(pseudo_res_3_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_4_theta$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_4_theta$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_4_theta$Res[is.finite(pseudo_res_4_theta$Res)], main = "4-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_4_theta$Res[is.finite(pseudo_res_4_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_5_theta$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_5_theta$Res, col = "steelblue", lwd = 3)
-
-
+qqnorm(pseudo_res_5_theta$Res[is.finite(pseudo_res_5_theta$Res)], main = "5-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_5_theta$Res[is.finite(pseudo_res_5_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
 ### kappa
-qqnorm(pseudo_res_2_kappa$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_2_kappa$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_2_kappa$Res[is.finite(pseudo_res_2_kappa$Res)], main = "2-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_2_kappa$Res[is.finite(pseudo_res_2_kappa$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 1", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_3_kappa$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_3_kappa$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_3_kappa$Res[is.finite(pseudo_res_3_kappa$Res)], main = "3-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_3_kappa$Res[is.finite(pseudo_res_3_kappa$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_4_kappa$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_4_kappa$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_4_kappa$Res[is.finite(pseudo_res_4_kappa$Res)], main = "4-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_4_kappa$Res[is.finite(pseudo_res_4_kappa$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_5_kappa$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_5_kappa$Res, col = "steelblue", lwd = 3)
-
+qqnorm(pseudo_res_5_kappa$Res[is.finite(pseudo_res_5_kappa$Res)], main = "5-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_5_kappa$Res[is.finite(pseudo_res_5_kappa$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
 ### sigma
-qqnorm(pseudo_res_2_sigma$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_2_sigma$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_2_sigma$Res[is.finite(pseudo_res_2_sigma$Res)], main = "2-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_2_sigma$Res[is.finite(pseudo_res_2_sigma$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 3436", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_3_sigma$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_3_sigma$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_3_sigma$Res[is.finite(pseudo_res_3_sigma$Res)], main = "3-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_3_sigma$Res[is.finite(pseudo_res_3_sigma$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 3437", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_4_sigma$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_4_sigma$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_4_sigma$Res[is.finite(pseudo_res_4_sigma$Res)], main = "4-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_4_sigma$Res[is.finite(pseudo_res_4_sigma$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_5_sigma$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_5_sigma$Res, col = "steelblue", lwd = 3)
-
-
+qqnorm(pseudo_res_5_sigma$Res[is.finite(pseudo_res_5_sigma$Res)], main = "5-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_5_sigma$Res[is.finite(pseudo_res_5_sigma$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 3437", bty = "n", cex = 0.8)
 
 ### theta sigma
-qqnorm(pseudo_res_2_sigma_theta$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_2_sigma_theta$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_2_sigma_theta$Res[is.finite(pseudo_res_2_sigma_theta$Res)], main = "2-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_2_sigma_theta$Res[is.finite(pseudo_res_2_sigma_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 3437", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_3_sigma_theta$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_3_sigma_theta$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_3_sigma_theta$Res[is.finite(pseudo_res_3_sigma_theta$Res)], main = "3-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_3_sigma_theta$Res[is.finite(pseudo_res_3_sigma_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_4_sigma_theta$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_4_sigma_theta$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_4_sigma_theta$Res[is.finite(pseudo_res_4_sigma_theta$Res)], main = "4-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_4_sigma_theta$Res[is.finite(pseudo_res_4_sigma_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_5_sigma_theta$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_5_sigma_theta$Res, col = "steelblue", lwd = 3)
-
-
-
+qqnorm(pseudo_res_5_sigma_theta$Res[is.finite(pseudo_res_5_sigma_theta$Res)], main = "5-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_5_sigma_theta$Res[is.finite(pseudo_res_5_sigma_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
 ### kappa theta
-qqnorm(pseudo_res_2_kappa_theta$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_2_kappa_theta$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_2_kappa_theta$Res[is.finite(pseudo_res_2_kappa_theta$Res)], main = "2-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_2_kappa_theta$Res[is.finite(pseudo_res_2_kappa_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_3_kappa_theta$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_3_kappa_theta$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_3_kappa_theta$Res[is.finite(pseudo_res_3_kappa_theta$Res)], main = "3-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_3_kappa_theta$Res[is.finite(pseudo_res_3_kappa_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_4_kappa_theta$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_4_kappa_theta$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_4_kappa_theta$Res[is.finite(pseudo_res_4_kappa_theta$Res)], main = "4-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_4_kappa_theta$Res[is.finite(pseudo_res_4_kappa_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 3437", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_5_kappa_theta$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_5_kappa_theta$Res, col = "steelblue", lwd = 3)
-
+qqnorm(pseudo_res_5_kappa_theta$Res[is.finite(pseudo_res_5_kappa_theta$Res)], main = "5-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_5_kappa_theta$Res[is.finite(pseudo_res_5_kappa_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
 ### sigma kappa
-qqnorm(pseudo_res_2_kappa_sigma$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_2_kappa_sigma$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_2_kappa_sigma$Res[is.finite(pseudo_res_2_kappa_sigma$Res)], main = "2-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_2_kappa_sigma$Res[is.finite(pseudo_res_2_kappa_sigma$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 3437", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_3_kappa_sigma$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_3_kappa_sigma$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_3_kappa_sigma$Res[is.finite(pseudo_res_3_kappa_sigma$Res)], main = "3-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_3_kappa_sigma$Res[is.finite(pseudo_res_3_kappa_sigma$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_4_kappa_sigma$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_4_kappa_sigma$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_4_kappa_sigma$Res[is.finite(pseudo_res_4_kappa_sigma$Res)], main = "4-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_4_kappa_sigma$Res[is.finite(pseudo_res_4_kappa_sigma$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 3", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_5_kappa_sigma$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_5_kappa_sigma$Res, col = "steelblue", lwd = 3)
-
-
-
-
+qqnorm(pseudo_res_5_kappa_sigma$Res[is.finite(pseudo_res_5_kappa_sigma$Res)], main = "5-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_5_kappa_sigma$Res[is.finite(pseudo_res_5_kappa_sigma$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
 ### theta sigma kappa
-qqnorm(pseudo_res_2_sigma_kappa_theta$Res, main = "2-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_2_sigma_kappa_theta$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_2_sigma_kappa_theta$Res[is.finite(pseudo_res_2_sigma_kappa_theta$Res)], main = "2-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_2_sigma_kappa_theta$Res[is.finite(pseudo_res_2_sigma_kappa_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 2", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_3_sigma_kappa_theta$Res, main = "3-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_3_sigma_kappa_theta$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_3_sigma_kappa_theta$Res[is.finite(pseudo_res_3_sigma_kappa_theta$Res)], main = "3-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_3_sigma_kappa_theta$Res[is.finite(pseudo_res_3_sigma_kappa_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 1", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_4_sigma_kappa_theta$Res, main = "4-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_4_sigma_kappa_theta$Res, col = "steelblue", lwd = 3)
+qqnorm(pseudo_res_4_sigma_kappa_theta$Res[is.finite(pseudo_res_4_sigma_kappa_theta$Res)], main = "4-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_4_sigma_kappa_theta$Res[is.finite(pseudo_res_4_sigma_kappa_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
-qqnorm(pseudo_res_5_sigma_kappa_theta$Res, main = "5-State HMM", col = "#901a1E",
-       xlab = "", ylab = "", cex.main = 1.5)
-qqline(pseudo_res_5_sigma_kappa_theta$Res, col = "steelblue", lwd = 3)
-
-
-
+qqnorm(pseudo_res_5_sigma_kappa_theta$Res[is.finite(pseudo_res_5_sigma_kappa_theta$Res)], main = "5-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
+qqline(pseudo_res_5_sigma_kappa_theta$Res[is.finite(pseudo_res_5_sigma_kappa_theta$Res)], col = "steelblue", lwd = 3)
+legend("bottomright", legend = "Missing values: 1", bty = "n", cex = 0.8)
 
 
 mtext("Sample Quantiles", side = 2, line = 1.2, outer = TRUE, cex = 1.4)
@@ -550,4 +332,3 @@ mtext(expression(kappa * ", " * theta), side = 4, line = 1, outer = TRUE, cex = 
 mtext(expression(sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[6])
 mtext(expression(theta * ", " * sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[7])
 dev.off()
-
