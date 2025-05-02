@@ -10,82 +10,65 @@ load("fitted_models_HMM.RData")
 #----------------------------------------- N-state HMM --------------------------------------------------------
 
 
-### Function to extract CIR-ARHMM model parameters from optimization vector
+### Extract CIR-ARHMM parameters
 extract_parameters_CIR <- function(theta.star, N) {
-  # Extract and transform kappa parameter (scaled by 252 for annualization)
   kappa <- exp(theta.star[1:N]) * 252
-  
-  # Extract theta parameter (no scaling)
   theta <- exp(theta.star[(N + 1):(2 * N)])
-  
-  # Extract sigma parameter (scaled by sqrt(252) for annualization)
   sigma <- exp(theta.star[(2 * N + 1):(3 * N)]) * sqrt(252)
   
-  # Extract and construct the transition matrix Gamma
   Gamma <- diag(N)
   Gamma[!Gamma] <- exp(theta.star[(3 * N + 1):length(theta.star)])
-  Gamma <- Gamma / rowSums(Gamma)  # Normalize rows to sum to 1
+  Gamma <- Gamma / rowSums(Gamma)
   
-  # Compute stationary distribution delta
   delta <- solve(t(diag(N) - Gamma + 1), rep(1, N))
   
-  # Return list of model parameters
   list(kappa = kappa, theta = theta, sigma = sigma, Gamma = Gamma, delta = delta)
 }
 
-### Function to compute the log-forward probabilities for the CIR-ARHMM
+
+### Log-forward algorithm for CIR-ARHMM
 lForward_CIR <- function(y, mod, N, dt = 1/252) {
-  # Extract parameters from optimization object
   params <- extract_parameters_CIR(mod$par, N)
+  T <- length(y)
   
-  T <- length(y)  # Total number of observations
-  lalpha <- matrix(NA, N, T)  # Matrix to store log-forward probabilities
-  
-  # Assign extracted parameters to local variables
   kappa <- params$kappa
   theta <- params$theta
   sigma <- params$sigma
   delta <- params$delta
   Gamma <- params$Gamma
   
-  # Precompute constants for CIR transition density
   q <- 2 * kappa * theta / sigma^2 - 1
   c <- 2 * kappa / ((1 - exp(-kappa * dt)) * sigma^2)
   
-  # Calculate transition probabilities from r_1 to r_2
-  u <- c * y[1] * exp(-kappa * dt)
-  v <- c * y[2]
-  df <- 2 * q + 2
-  ncp <- 2 * u
-  P <- dchisq(y[2] * (2 * c), df = df, ncp = ncp) * (2 * c)
+  lalpha <- matrix(NA, N, T)
+  lalpha[, 1] <- log(delta)  # log-initialize with stationary distribution
   
-  # Initial log-forward values
-  foo <- delta * P
-  sumfoo <- sum(foo)
-  lscale <- log(sumfoo)
-  foo <- foo / sumfoo
-  lalpha[, 1] <- lscale + log(foo)
+  lscale <- 0  # running log-scale tracker for stability (optional)
   
-  # Forward recursion over remaining time steps
-  for (i in 3:T) {
+  for (i in 2:T) {
     u <- c * y[i - 1] * exp(-kappa * dt)
-    v <- c * y[i]
-    P <- dchisq(y[i] * (2 * c), df = 2 * q + 2, ncp = 2 * u) * (2 * c)
+    df <- 2 * q + 2
+    ncp <- 2 * u
+    P <- dchisq(y[i] * (2 * c), df = df, ncp = ncp) * (2 * c)
     
-    # Update probabilities using Markov transition
+    # Log-sum-exp for numerical stability
+    cmax <- max(lalpha[, i - 1])
+    foo <- exp(lalpha[, i - 1] - cmax)
+    foo <- foo / sum(foo)  # normalize
     foo <- foo %*% Gamma * P
+    
     sumfoo <- sum(foo)
     lscale <- lscale + log(sumfoo)
     foo <- foo / sumfoo
-    lalpha[, i - 1] <- log(foo) + lscale
+    lalpha[, i] <- log(foo) + lscale
   }
   
   return(lalpha)
 }
 
-### Function to compute pseudo-residuals for diagnostic purposes
+
+### Compute pseudo-residuals for CIR-ARHMM
 PseudoResiduals <- function(y, mod, N, dt = 1/252) {
-  # Extract model parameters
   params <- extract_parameters_CIR(mod$par, N)
   kappa <- params$kappa
   theta <- params$theta
@@ -93,46 +76,43 @@ PseudoResiduals <- function(y, mod, N, dt = 1/252) {
   delta <- params$delta
   Gamma <- params$Gamma
   
-  # Precompute constants
+  T <- length(y)
   q <- 2 * kappa * theta / sigma^2 - 1
   c <- 2 * kappa / ((1 - exp(-kappa * dt)) * sigma^2)
+  
+  la <- t(lForward_CIR(y = y, mod = mod, N = N, dt = dt))
+  Res <- rep(NA, T - 1)
+  pMat <- matrix(NA, nrow = T - 1, ncol = N)
+  
+  # Residual at time t = 2 (based on y[1])
   u <- c * y[1] * exp(-kappa * dt)
-  v <- c * y[2]
-  
-  df <- 2 * q + 2 # Degrees of freedom of the scaled non-central chi square
-  ncp <- 2 * u # non-centrality parameter of the scaled non-central chi square
-  
-  # Calculate log-forward probabilities
-  la <- t(lForward_CIR(y = y, mod = mod, N = N))
-  n <- length(y)
-  Res <- rep(NA, n)  # Initialize residuals vector
-  pMat <- matrix(NA, nrow = n, ncol = N)  # Matrix to store CDF values
-  
-  # Compute probability for first residual
+  df <- 2 * q + 2
+  ncp <- 2 * u
   pMat[1, ] <- pchisq(y[2] * (2 * c), df = df, ncp = ncp)
-  Res[1] <- qnorm(params$delta %*% pMat[1, ])
+  Res[1] <- qnorm(drop(params$delta %*% pMat[1, ]))
   
-  # Loop over time steps to compute remaining residuals
-  for (i in 3:n) {
-    q <- 2 * kappa * theta / sigma^2 - 1
-    u <- c * y[i-1] * exp(-kappa * dt)
+  # Residuals for t = 3 to T
+  # Residuals for t = 3 to T
+  for (i in 3:T) {
+    if (i %% 100 == 0) {
+      message("Computing residual ", i - 1, " of ", T - 1)
+    }
+    
+    u <- c * y[i - 1] * exp(-kappa * dt)
     df <- 2 * q + 2
     ncp <- 2 * u
+    pMat[i - 1, ] <- pchisq(y[i] * (2 * c), df = df, ncp = ncp)
     
-    # Compute CDF of non-central chi-square for each state
-    pMat[i-1, ] <- pchisq(y[i] * (2 * c), df = df, ncp = ncp)
-    
-    # Compute state probabilities using smoothed weights
-    c <- max(la[i - 2, ])
-    a <- exp(la[i - 2, ] - c)  # Stabilize log-space probabilities
+    cmax <- max(la[i - 2, ])
+    a <- exp(la[i - 2, ] - cmax)
     weights <- a / sum(a)
-    weighted_Gamma <- t(weights) %*% Gamma
+    predictive_probs <- drop(weights %*% Gamma)
     
-    # Calculate pseudo-residual
-    Res[i - 1] <- qnorm(weighted_Gamma %*% pMat[i-1, ])
+    Res[i - 1] <- qnorm(predictive_probs %*% pMat[i - 1, ])
   }
   
-  return(list(Res = Res))
+  
+  return(list(Res = Res, pMat = pMat))
 }
 
 #----------------------------------------- PseudoResiduals --------------------------------------------------------
