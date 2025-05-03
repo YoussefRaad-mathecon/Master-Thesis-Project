@@ -43,7 +43,7 @@ lForward_CIR <- function(y, mod, N, dt = 1/252) {
   lalpha <- matrix(NA, N, T)
   lalpha[, 1] <- log(delta)  # log-initialize with stationary distribution
   
-  lscale <- 0  # running log-scale tracker for stability (optional)
+  lscale <- 0  # running log-scale tracker for stability
   
   for (i in 2:T) {
     u <- c * y[i - 1] * exp(-kappa * dt)
