@@ -43,7 +43,7 @@ lForward_CIR <- function(y, mod, N, dt = 1/252) {
   lalpha <- matrix(NA, N, T)
   lalpha[, 1] <- log(delta)  # log-initialize with stationary distribution
   
-  lscale <- 0  # running log-scale tracker for stability
+  lscale <- 0  # running log-scale tracker for stability (optional)
   
   for (i in 2:T) {
     u <- c * y[i - 1] * exp(-kappa * dt)
@@ -115,6 +115,7 @@ PseudoResiduals <- function(y, mod, N, dt = 1/252) {
   return(list(Res = Res, pMat = pMat))
 }
 
+
 #----------------------------------------- PseudoResiduals --------------------------------------------------------
 
 
@@ -126,8 +127,8 @@ pseudo_res_3_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3_theta, N 
 pseudo_res_4_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4_theta, N = 4) # 4 errors
 pseudo_res_5_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_theta, N = 5) # 2 errors
 sum(!is.finite(pseudo_res_2_theta$Res)) # 0
-sum(!is.finite(pseudo_res_3_theta$Res)) # 0 
-sum(!is.finite(pseudo_res_4_theta$Res)) # 0 
+sum(!is.finite(pseudo_res_3_theta$Res)) # 1
+sum(!is.finite(pseudo_res_4_theta$Res)) # 0
 sum(!is.finite(pseudo_res_5_theta$Res)) # 0
 
 ### kappa
@@ -135,9 +136,9 @@ pseudo_res_2_kappa <- PseudoResiduals(as.numeric(yields_df$"3M"), mod2_kappa, N 
 pseudo_res_3_kappa <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3_kappa, N = 3)
 pseudo_res_4_kappa <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4_kappa, N = 4)
 pseudo_res_5_kappa <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_kappa, N = 5)
-sum(!is.finite(pseudo_res_2_kappa$Res)) # 1
+sum(!is.finite(pseudo_res_2_kappa$Res)) # 0
 sum(!is.finite(pseudo_res_3_kappa$Res)) # 0 
-sum(!is.finite(pseudo_res_4_kappa$Res)) # 0 
+sum(!is.finite(pseudo_res_4_kappa$Res)) # 0
 sum(!is.finite(pseudo_res_5_kappa$Res)) # 0
 
 ### sigma
@@ -145,9 +146,9 @@ pseudo_res_2_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod2_sigma, N 
 pseudo_res_3_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3_sigma, N = 3)
 pseudo_res_4_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4_sigma, N = 4)
 pseudo_res_5_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_sigma, N = 5)
-sum(!is.finite(pseudo_res_2_sigma$Res)) # 3436
-sum(!is.finite(pseudo_res_3_sigma$Res)) # 3437
-sum(!is.finite(pseudo_res_4_sigma$Res)) # 0 
+sum(!is.finite(pseudo_res_2_sigma$Res)) # 3435
+sum(!is.finite(pseudo_res_3_sigma$Res)) # 3443
+sum(!is.finite(pseudo_res_4_sigma$Res)) # 0
 sum(!is.finite(pseudo_res_5_sigma$Res)) # 3437
 
 
@@ -171,7 +172,7 @@ pseudo_res_4_kappa_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4_kap
 pseudo_res_5_kappa_sigma <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_kappa_sigma, N = 5)
 sum(!is.finite(pseudo_res_2_kappa_sigma$Res)) # 3437
 sum(!is.finite(pseudo_res_3_kappa_sigma$Res)) # 0
-sum(!is.finite(pseudo_res_4_kappa_sigma$Res)) # 3
+sum(!is.finite(pseudo_res_4_kappa_sigma$Res)) # 0
 sum(!is.finite(pseudo_res_5_kappa_sigma$Res)) # 0
 
 
@@ -182,9 +183,9 @@ pseudo_res_2_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod2_kap
 pseudo_res_3_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3_kappa_theta, N = 3)
 pseudo_res_4_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4_kappa_theta, N = 4) # 3 errors
 pseudo_res_5_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5_kappa_theta, N = 5)
-sum(!is.finite(pseudo_res_2_kappa_theta$Res)) # 0
+sum(!is.finite(pseudo_res_2_kappa_theta$Res)) # 9
 sum(!is.finite(pseudo_res_3_kappa_theta$Res)) # 0
-sum(!is.finite(pseudo_res_4_kappa_theta$Res)) # 3437
+sum(!is.finite(pseudo_res_4_kappa_theta$Res)) # 3439
 sum(!is.finite(pseudo_res_5_kappa_theta$Res)) # 0
 
 
@@ -197,12 +198,51 @@ pseudo_res_2_sigma_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mo
 pseudo_res_3_sigma_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod3, N = 3)
 pseudo_res_4_sigma_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod4, N = 4)
 pseudo_res_5_sigma_kappa_theta <- PseudoResiduals(as.numeric(yields_df$"3M"), mod5, N = 5)
-sum(!is.finite(pseudo_res_2_sigma_kappa_theta$Res)) # 2
-sum(!is.finite(pseudo_res_3_sigma_kappa_theta$Res)) # 1
+sum(!is.finite(pseudo_res_2_sigma_kappa_theta$Res)) # 0
+sum(!is.finite(pseudo_res_3_sigma_kappa_theta$Res)) # 0
 sum(!is.finite(pseudo_res_4_sigma_kappa_theta$Res)) # 0
-sum(!is.finite(pseudo_res_5_sigma_kappa_theta$Res)) # 1
+sum(!is.finite(pseudo_res_5_sigma_kappa_theta$Res)) # 0
 
+# Collect all pseudo-residuals into a list
+pseudo_residuals_list <- list(
+  pseudo_res_2_theta = pseudo_res_2_theta,
+  pseudo_res_3_theta = pseudo_res_3_theta,
+  pseudo_res_4_theta = pseudo_res_4_theta,
+  pseudo_res_5_theta = pseudo_res_5_theta,
+  
+  pseudo_res_2_kappa = pseudo_res_2_kappa,
+  pseudo_res_3_kappa = pseudo_res_3_kappa,
+  pseudo_res_4_kappa = pseudo_res_4_kappa,
+  pseudo_res_5_kappa = pseudo_res_5_kappa,
+  
+  pseudo_res_2_sigma = pseudo_res_2_sigma,
+  pseudo_res_3_sigma = pseudo_res_3_sigma,
+  pseudo_res_4_sigma = pseudo_res_4_sigma,
+  pseudo_res_5_sigma = pseudo_res_5_sigma,
+  
+  pseudo_res_2_sigma_theta = pseudo_res_2_sigma_theta,
+  pseudo_res_3_sigma_theta = pseudo_res_3_sigma_theta,
+  pseudo_res_4_sigma_theta = pseudo_res_4_sigma_theta,
+  pseudo_res_5_sigma_theta = pseudo_res_5_sigma_theta,
+  
+  pseudo_res_2_kappa_sigma = pseudo_res_2_kappa_sigma,
+  pseudo_res_3_kappa_sigma = pseudo_res_3_kappa_sigma,
+  pseudo_res_4_kappa_sigma = pseudo_res_4_kappa_sigma,
+  pseudo_res_5_kappa_sigma = pseudo_res_5_kappa_sigma,
+  
+  pseudo_res_2_kappa_theta = pseudo_res_2_kappa_theta,
+  pseudo_res_3_kappa_theta = pseudo_res_3_kappa_theta,
+  pseudo_res_4_kappa_theta = pseudo_res_4_kappa_theta,
+  pseudo_res_5_kappa_theta = pseudo_res_5_kappa_theta,
+  
+  pseudo_res_2_sigma_kappa_theta = pseudo_res_2_sigma_kappa_theta,
+  pseudo_res_3_sigma_kappa_theta = pseudo_res_3_sigma_kappa_theta,
+  pseudo_res_4_sigma_kappa_theta = pseudo_res_4_sigma_kappa_theta,
+  pseudo_res_5_sigma_kappa_theta = pseudo_res_5_sigma_kappa_theta
+)
 
+# Save
+save(pseudo_residuals_list, file = "pseudoresiduals.RData")
 
 #----------------------------------------- BIG PLOT --------------------------------------------------------
 
@@ -308,7 +348,7 @@ legend("bottomright", legend = "Missing values: 0", bty = "n", cex = 0.8)
 
 qqnorm(pseudo_res_4_kappa_sigma$Res[is.finite(pseudo_res_4_kappa_sigma$Res)], main = "4-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
 qqline(pseudo_res_4_kappa_sigma$Res[is.finite(pseudo_res_4_kappa_sigma$Res)], col = "steelblue", lwd = 3)
-legend("bottomright", legend = "Missing values: 3", bty = "n", cex = 0.8)
+legend("bottomright", legend = "Missing values: 2", bty = "n", cex = 0.8)
 
 qqnorm(pseudo_res_5_kappa_sigma$Res[is.finite(pseudo_res_5_kappa_sigma$Res)], main = "5-State HMM", col = "#901a1E", xlab = "", ylab = "", cex.main = 1.5)
 qqline(pseudo_res_5_kappa_sigma$Res[is.finite(pseudo_res_5_kappa_sigma$Res)], col = "steelblue", lwd = 3)
@@ -351,7 +391,4 @@ mtext(expression(sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 
 mtext(expression(theta * ", " * sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[7])
 dev.off()
 
-
-
-### 6 models where I need to use is.finite as the pseudo-residual function returns either NA/NAN/INF.
 
