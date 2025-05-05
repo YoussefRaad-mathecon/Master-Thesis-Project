@@ -12,9 +12,9 @@ load("fitted_models_HMM.RData")
 
 ### Extract CIR-ARHMM parameters
 extract_parameters_CIR <- function(theta.star, N) {
-  kappa <- exp(theta.star[1:N]) * 252
+  kappa <- exp(theta.star[1:N])
   theta <- exp(theta.star[(N + 1):(2 * N)])
-  sigma <- exp(theta.star[(2 * N + 1):(3 * N)]) * sqrt(252)
+  sigma <- exp(theta.star[(2 * N + 1):(3 * N)]) 
   
   Gamma <- diag(N)
   Gamma[!Gamma] <- exp(theta.star[(3 * N + 1):length(theta.star)])
@@ -27,7 +27,7 @@ extract_parameters_CIR <- function(theta.star, N) {
 
 
 ### Log-forward algorithm for CIR-ARHMM
-lForward_CIR <- function(y, mod, N, dt = 1/252) {
+lForward_CIR <- function(y, mod, N, dt = 1) {
   params <- extract_parameters_CIR(mod$par, N)
   T <- length(y)
   
@@ -68,7 +68,7 @@ lForward_CIR <- function(y, mod, N, dt = 1/252) {
 
 
 ### Compute pseudo-residuals for CIR-ARHMM
-PseudoResiduals <- function(y, mod, N, dt = 1/252) {
+PseudoResiduals <- function(y, mod, N, dt = 1) {
   params <- extract_parameters_CIR(mod$par, N)
   kappa <- params$kappa
   theta <- params$theta
@@ -203,6 +203,10 @@ sum(!is.finite(pseudo_res_3_sigma_kappa_theta$Res)) # 0
 sum(!is.finite(pseudo_res_4_sigma_kappa_theta$Res)) # 0
 sum(!is.finite(pseudo_res_5_sigma_kappa_theta$Res)) # 0
 
+
+# Load
+load("pseudoresiduals.RData")
+
 # Collect all pseudo-residuals into a list
 pseudo_residuals_list <- list(
   pseudo_res_2_theta = pseudo_res_2_theta,
@@ -241,10 +245,8 @@ pseudo_residuals_list <- list(
   pseudo_res_5_sigma_kappa_theta = pseudo_res_5_sigma_kappa_theta
 )
 
-# Save
-save(pseudo_residuals_list, file = "pseudoresiduals.RData")
 
-#----------------------------------------- BIG PLOT --------------------------------------------------------
+#----------------------------------------- QQ-plot --------------------------------------------------------
 
 
 png("big_plot.png", width = 2400, height = 3200, res = 300)
@@ -373,8 +375,9 @@ legend("bottomright", legend = "Missing values: 1", bty = "n", cex = 0.8)
 
 
 
+sum(pseudo_res_5_sigma_kappa_theta$Res >= -2.5 & pseudo_res_5_sigma_kappa_theta$Res <= 2.5, na.rm = TRUE)
 
-
+9479/9616
 
 mtext("Sample Quantiles", side = 2, line = 1.2, outer = TRUE, cex = 1.4)
 
@@ -391,4 +394,195 @@ mtext(expression(sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 
 mtext(expression(theta * ", " * sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[7])
 dev.off()
 
+
+#----------------------------------------------Time Series plot------------------------------------------#
+
+# Set up PNG output
+png("TimeSeries.png", width = 2400, height = 3200, res = 300)
+par(mfrow = c(7, 4), mar = c(2, 2, 2, 1), oma = c(3, 3, 0, 2))
+
+# Aligned dates
+date_aligned <- yields_df$DateCont[-1]
+
+# Loop through residuals
+for (name in names(pseudo_residuals_list)) {
+  res <- pseudo_residuals_list[[name]]$Res
+  
+  # Skip if length doesn't match
+  if (length(res) != length(date_aligned)) {
+    warning(paste("Skipping", name, "due to length mismatch"))
+    plot(1, type = "n", axes = FALSE, xlab = "", ylab = "")  # blank plot
+    next
+  }
+  
+  # Remove NA values
+  complete_idx <- complete.cases(res)
+  dates_clean <- date_aligned[complete_idx]
+  res_clean <- res[complete_idx]
+  
+  # Plot residual time series (with axis ticks, no title)
+  plot(dates_clean, res_clean, type = "l", col = "#901a1E", lwd = 1,
+       xlab = "", ylab = "")
+}
+
+# Global y-axis label
+mtext("Residuals", side = 2, line = 1.2, outer = TRUE, cex = 1.4)
+
+# Add labels for each row group on the right side
+at_vals <- rev(((1:7) - 0.5) / 7)
+mtext(expression(theta), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[1])
+mtext(expression(kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[2])
+mtext(expression(sigma), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[3])
+mtext(expression(theta * ", " * sigma), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[4])
+mtext(expression(kappa * ", " * theta), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[5])
+mtext(expression(sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[6])
+mtext(expression(theta * ", " * sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[7])
+
+# Close device
+dev.off()
+
+#----------------------------------------------ACF plot--------------------------------------------------#
+# Set up PNG for ACF plots
+png("ACFSeries.png", width = 2400, height = 3200, res = 300)
+par(mfrow = c(7, 4), mar = c(2, 2, 2, 1), oma = c(3, 3, 0, 2))
+
+# Custom red color
+acf_col <- "#901a1E"
+
+for (name in names(pseudo_residuals_list)) {
+  res <- pseudo_residuals_list[[name]]$Res
+  
+  # Check for valid residuals: at least 2 finite values
+  if (is.null(res) || sum(is.finite(res)) < 2) {
+    warning(paste("Skipping", name, "due to insufficient finite values"))
+    plot(1, type = "n", axes = FALSE, xlab = "", ylab = "")  # blank plot
+    next
+  }
+  
+  # Use only finite values
+  res_clean <- res[is.finite(res)]
+  
+  # Compute ACF but don't plot yet
+  acf_obj <- acf(res_clean, plot = FALSE)
+  
+  # Now plot manually with custom color
+  plot(acf_obj, main = "", xlab = "", ylab = "", col = acf_col, lwd = 2)
+}
+
+# Global y-axis label
+mtext("Autocorrelation", side = 2, line = 1.2, outer = TRUE, cex = 1.4)
+
+# Right-side row labels
+at_vals <- rev(((1:7) - 0.5) / 7)
+mtext(expression(theta), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[1])
+mtext(expression(kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[2])
+mtext(expression(sigma), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[3])
+mtext(expression(theta * ", " * sigma), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[4])
+mtext(expression(kappa * ", " * theta), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[5])
+mtext(expression(sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[6])
+mtext(expression(theta * ", " * sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[7])
+
+# Close PNG device
+dev.off()
+
+
+#------------------------------------------Histogram Plot--------------------------------------------------#
+# Set up PNG for histograms
+png("HistogramSeries.png", width = 2400, height = 3200, res = 300)
+par(mfrow = c(7, 4), mar = c(2, 2, 2, 1), oma = c(3, 3, 0, 2))
+
+# Custom red color for histogram bars
+hist_col <- "#901a1E"
+
+for (name in names(pseudo_residuals_list)) {
+  res <- pseudo_residuals_list[[name]]$Res
+  
+  # Check for valid residuals: at least 2 finite values
+  if (is.null(res) || sum(is.finite(res)) < 2) {
+    warning(paste("Skipping", name, "due to insufficient finite values"))
+    plot(1, type = "n", axes = FALSE, xlab = "", ylab = "")  # blank plot
+    next
+  }
+  
+  # Use only finite values
+  res_clean <- res[is.finite(res)]
+  
+  # Trim to 1st–99th percentile range
+  q_low <- quantile(res_clean, 0.01, na.rm = TRUE)
+  q_high <- quantile(res_clean, 0.99, na.rm = TRUE)
+  res_trimmed <- res_clean[res_clean >= q_low & res_clean <= q_high]
+  
+  # Plot histogram
+  hist(res_trimmed,
+       breaks = 20,
+       col = hist_col,
+       border = "white",
+       main = "",
+       xlab = "",
+       ylab = "")
+}
+
+# Global y-axis label
+mtext("Frequency", side = 2, line = 1.2, outer = TRUE, cex = 1.4)
+
+# Right-side row labels
+at_vals <- rev(((1:7) - 0.5) / 7)
+mtext(expression(theta), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[1])
+mtext(expression(kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[2])
+mtext(expression(sigma), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[3])
+mtext(expression(theta * ", " * sigma), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[4])
+mtext(expression(kappa * ", " * theta), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[5])
+mtext(expression(sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[6])
+mtext(expression(theta * ", " * sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[7])
+
+# Close PNG device
+dev.off()
+
+
+#------------------------------------------Histogram Plot (All Residuals)------------------------------------------#
+# Set up PNG for histograms
+png("HistogramSeries_AllResiduals.png", width = 2400, height = 3200, res = 300)
+par(mfrow = c(7, 4), mar = c(2, 2, 2, 1), oma = c(3, 3, 0, 2))
+
+# Custom red color for histogram bars
+hist_col <- "#901a1E"
+
+for (name in names(pseudo_residuals_list)) {
+  res <- pseudo_residuals_list[[name]]$Res
+  
+  # Check for valid residuals: at least 2 finite values
+  if (is.null(res) || sum(is.finite(res)) < 2) {
+    warning(paste("Skipping", name, "due to insufficient finite values"))
+    plot(1, type = "n", axes = FALSE, xlab = "", ylab = "")  # blank plot
+    next
+  }
+  
+  # Use all finite residuals
+  res_clean <- res[is.finite(res)]
+  
+  # Plot histogram
+  hist(res_clean,
+       breaks = 20,
+       col = hist_col,
+       border = "white",
+       main = "",
+       xlab = "",
+       ylab = "")
+}
+
+# Global y-axis label
+mtext("Frequency", side = 2, line = 1.2, outer = TRUE, cex = 1.4)
+
+# Right-side row labels
+at_vals <- rev(((1:7) - 0.5) / 7)
+mtext(expression(theta), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[1])
+mtext(expression(kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[2])
+mtext(expression(sigma), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[3])
+mtext(expression(theta * ", " * sigma), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[4])
+mtext(expression(kappa * ", " * theta), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[5])
+mtext(expression(sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[6])
+mtext(expression(theta * ", " * sigma * ", " * kappa), side = 4, line = 1, outer = TRUE, cex = 2, at = at_vals[7])
+
+# Close PNG device
+dev.off()
 
