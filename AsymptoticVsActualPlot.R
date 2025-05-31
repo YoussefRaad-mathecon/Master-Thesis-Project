@@ -94,18 +94,18 @@ ggplot(data, aes(x = Time)) +
   geom_line(aes(y = SR), color = "#87A96B", size = 1) +
   geom_ribbon(aes(ymin = Lower_stat, ymax = Upper_stat), alpha = 0.2, fill = "#96C8A2", col = "#96C8A2") +
   geom_ribbon(aes(ymin = Lower, ymax = Upper), alpha = 0.2, fill = "#801818", col = "#801818", linetype = "longdash") +
-  theme_minimal(base_family = "serif") +
-  labs(x = TeX("Time in Years"),
-       y = TeX("Short Rate")) +
+  theme_minimal() +
+  labs(x = "Time in Years",
+       y = "Short Rate") +
   scale_y_continuous(limits = c(0.026, 0.033)) +
   theme(
-    text = element_text(family = "serif", size = 14),
+    text = element_text(size = 14),
     axis.title = element_text(size = 14),
     axis.text.x = element_text(size = 14),
     axis.text.y = element_text(size = 14),
     plot.title = element_text(size = 14, hjust = 0)
   ) +
   annotate(geom = "text", x = 8, y = 0.0325, label = "CI - cond. dist.",
-           color = "#801818", size = 9, family = "serif") +
+           color = "#801818", size = 9) +
   annotate(geom = "text", x = 7.85, y = 0.0315, label = "CI - asymp. dist.",
-           color = "#96C8A2", size = 9, family = "serif")
+           color = "#96C8A2", size = 9)
